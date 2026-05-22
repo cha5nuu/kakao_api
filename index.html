@@ -28,12 +28,23 @@
         .search-panel {
             width: 350px; 
             height: 100%;
-            background-color: #f7f7f7;
+            background-color: #f8fafc; /* 연한 하늘빛이 도는 미색 바탕 */
             padding: 20px;
             display: flex;
             flex-direction: column;
-            border-right: 1px solid #ddd;
+            border-right: 1px solid #e2e8f0;
             z-index: 10; 
+        }
+
+        /* 서비스 메인 제목 스타일 (하늘색 테마 포인트) */
+        .service-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #0f172a;
+            margin-bottom: 15px;
+            letter-spacing: -0.5px;
+            border-bottom: 3px solid #38bdf8; /* 청량한 스카이 블루 하이라이트 */
+            padding-bottom: 8px;
         }
 
         .search-box {
@@ -45,22 +56,29 @@
         .search-box input {
             flex: 1;
             padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
             font-size: 14px;
+            outline: none;
+        }
+        
+        .search-box input:focus {
+            border-color: #38bdf8; /* 검색창 클릭 시 하늘색 테두리 */
         }
 
         .search-box button {
             padding: 10px 15px;
-            background-color: #fee500; 
+            background-color: #0284c7; /* 짙은 하늘색 버튼 */
+            color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
+            transition: background-color 0.2s;
         }
 
         .search-box button:hover {
-            background-color: #fada0a;
+            background-color: #0369a1; /* 마우스 올렸을 때 더 짙은 블루 */
         }
 
         /* 카테고리 탭 스타일 */
@@ -73,25 +91,27 @@
         .tab-button {
             flex: 1;
             padding: 10px;
-            background-color: #e0e0e0;
+            background-color: #e2e8f0;
+            color: #64748b;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
             font-size: 13px;
             font-weight: bold;
-            transition: background-color 0.2s;
+            transition: all 0.2s;
         }
 
+        /* 활성화된 탭 스타일 (하늘색 테마) */
         .tab-button.active {
-            background-color: #fee500;
-            color: #333;
+            background-color: #38bdf8;
+            color: white;
         }
 
         .tab-button:hover {
-            background-color: #d5d5d5;
+            background-color: #cbd5e1;
         }
         .tab-button.active:hover {
-            background-color: #fada0a;
+            background-color: #0ea5e9;
         }
 
         /* 검색 결과 리스트 영역 (스크롤 가능) */
@@ -104,25 +124,27 @@
         .result-item {
             padding: 15px;
             background-color: white;
-            border-radius: 4px;
+            border-radius: 6px;
             margin-bottom: 10px;
-            border: 1px solid #eee;
+            border: 1px solid #e2e8f0;
             cursor: pointer;
+            transition: all 0.2s;
         }
 
         .result-item:hover {
-            background-color: #f0f0f0;
+            background-color: #f0f9ff; /* 리스트 올렸을 때 은은한 하늘색 */
+            border-color: #bae6fd;
         }
 
         .result-item h5 {
             font-size: 16px;
-            color: #333;
+            color: #1e293b;
             margin-bottom: 5px;
         }
 
         .result-item p {
             font-size: 13px;
-            color: #666;
+            color: #64748b;
         }
 
         /* 오른쪽 지도 영역 스타일 */
@@ -142,15 +164,18 @@
             display: block;
             font-size: 14px;
             margin-bottom: 3px;
-            color: #000;
+            color: #0284c7; /* 팝업 텍스트 제목도 하늘색 포인트 */
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <!-- 왼쪽: 검색 및 결과창 -->
+        <!-- 왼쪽: 제목, 검색 및 결과창 -->
         <div class="search-panel">
+            <!-- 서비스 대제목 -->
+            <h1 class="service-title">대학로 주변 추천 서비스</h1>
+
             <!-- 키워드 검색창 -->
             <div class="search-box">
                 <input type="text" id="keyword" placeholder="장소를 입력하세요 (예: 혜화역 맛집)">
@@ -159,7 +184,7 @@
 
             <!-- 추천 카테고리 탭 -->
             <div class="tab-container">
-                <button class="tab-button" onclick="selectTab('FD6', this)">뭐 먹지?</button>
+                <button id="defaultTab" class="tab-button" onclick="selectTab('FD6', this)">뭐 먹지?</button>
                 <button class="tab-button" onclick="selectTab('CE7', this)">뭐 마시지?</button>
                 <button class="tab-button" onclick="selectTab('COMPLEX', this)">뭐 하지?</button>
             </div>
@@ -178,13 +203,16 @@
         let ps;
         let markers = []; 
         let infoWindow; // 상세 팝업을 위한 인포윈도우 객체
+        
+        // 대학로 마로니에공원/혜화역 기준의 고정 중심 좌표값
+        const daehangnoPosition = new kakao.maps.LatLng(37.5821, 127.0018);
 
         // 지도가 안전하게 로드된 후에 실행
         kakao.maps.load(function() {
             const mapContainer = document.getElementById('map'); 
             const mapOption = {
-                center: new kakao.maps.LatLng(37.5821, 127.0018), // 대학로 마로니에공원/혜화역 중심 좌표로 설정
-                level: 4 // 대학로 극장가가 한눈에 쏙 들어오는 최적의 확대 레벨(4) 설정
+                center: daehangnoPosition, // 초기 중심 위치를 대학로로 설정
+                level: 4 // 대학로 상권이 가장 잘 보이는 확대 레벨
             };
 
             // 지도 및 장소 검색 객체 생성
@@ -196,7 +224,9 @@
             const zoomControl = new kakao.maps.ZoomControl();
             map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHTTOP);
             
-            // 대학로 타겟 서비스이므로 고정된 사용자 혼란을 줄이기 위해 내 위치 연동(Geolocation) 코드는 제외했습니다.
+            // 앱이 켜지자마자 첫 번째 탭('뭐 먹지?')을 자동으로 실행시켜 대학로 주변을 즉시 탐색합니다.
+            const defaultTabBtn = document.getElementById('defaultTab');
+            selectTab('FD6', defaultTabBtn);
         });
 
         // 탭 선택 및 카테고리 검색 기능
@@ -214,10 +244,10 @@
             infoWindow.close();
             document.getElementById('placesList').innerHTML = '';
 
-            const currentCenter = map.getCenter(); // 현재 지도 중심 기준으로 검색
+            // 현재 지도의 중심점을 가져옴
+            const currentCenter = map.getCenter(); 
 
             if (categoryCode === 'COMPLEX') {
-                // '뭐 하지?' 탭은 문화시설(CT1)과 관광명소(AT4)를 동시에 가져와야 하므로 병렬 호출 처리
                 let combinedData = [];
                 let completedRequests = 0;
 
@@ -227,31 +257,33 @@
                         combinedData = combinedData.concat(data);
                     }
                     
-                    // 두 가지 카테고리 조회가 모두 끝났을 때 화면에 표시
                     if (completedRequests === 2) {
                         if (combinedData.length > 0) {
-                            displayPlaces(combinedData);
+                            displayPlaces(combinedData, false); // 카테고리 검색은 시점 고정
                         } else {
                             alert('주변에 문화시설이나 관광명소가 없습니다.');
                         }
                     }
                 };
 
-                // CT1 검색
+                // 문화시설(CT1) 및 관광명소(AT4) 반경 1km 이내 검색
                 ps.categorySearch('CT1', function(data, status) {
                     handleComplexResult(data, status);
-                }, { location: currentCenter, radius: 1500 });
+                }, { location: currentCenter, radius: 1000 });
 
-                // AT4 검색
                 ps.categorySearch('AT4', function(data, status) {
                     handleComplexResult(data, status);
-                }, { location: currentCenter, radius: 1500 });
+                }, { location: currentCenter, radius: 1000 });
 
             } else {
-                // 일반 카테고리(음식점, 카페) 검색 (대학로 특성에 맞춰 반경 1.5km 이내로 최적화)
-                ps.categorySearch(categoryCode, placesSearchCB, {
+                // 일반 카테고리(음식점, 카페) 반경 1km 이내 검색
+                ps.categorySearch(categoryCode, function(data, status) {
+                    if (status === kakao.maps.services.Status.OK) {
+                        displayPlaces(data, false); // 대학로 시점이 튕기지 않게 고정
+                    }
+                }, {
                     location: currentCenter,
-                    radius: 1500
+                    radius: 1000
                 });
             }
         }
@@ -265,27 +297,22 @@
                 return;
             }
 
-            // 키워드 검색 시에는 탭 활성화 상태 해제
             const buttons = document.querySelectorAll('.tab-button');
             buttons.forEach(btn => btn.classList.remove('active'));
 
             infoWindow.close();
-            ps.keywordSearch(keyword, placesSearchCB); 
-        }
-
-        // 장소검색 완료 콜백 함수
-        function placesSearchCB(data, status, pagination) {
-            if (status === kakao.maps.services.Status.OK) {
-                displayPlaces(data);
-            } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
-                alert('검색 결과가 존재하지 않습니다.');
-            } else if (status === kakao.maps.services.Status.ERROR) {
-                alert('검색 결과 중 오류가 발생했습니다.');
-            }
+            
+            ps.keywordSearch(keyword, function(data, status) {
+                if (status === kakao.maps.services.Status.OK) {
+                    displayPlaces(data, true); 
+                } else if (status === kakao.maps.services.Status.ZERO_RESULT) {
+                    alert('검색 결과가 존재하지 않습니다.');
+                }
+            }); 
         }
 
         // 검색 결과 목록과 마커 표출 함수
-        function displayPlaces(places) {
+        function displayPlaces(places, shouldMoveBounds) {
             const listEl = document.getElementById('placesList');
             const bounds = new kakao.maps.LatLngBounds();
             
@@ -300,7 +327,6 @@
                 });
                 markers.push(marker); 
 
-                // 리스트 아이템 생성
                 const itemEl = document.createElement('li');
                 itemEl.className = 'result-item';
                 itemEl.innerHTML = `
@@ -308,12 +334,10 @@
                     <p>${places[i].road_address_name ? places[i].road_address_name : places[i].address_name}</p>
                 `;
                 
-                // 마커 클릭 시 상세 팝업 표시 이벤트 등록
                 kakao.maps.event.addListener(marker, 'click', function() {
                     showInfoWindow(marker, places[i]);
                 });
 
-                // 리스트 아이템 클릭 시에도 지도 중심 이동 및 팝업 열기
                 itemEl.onclick = function() {
                     map.panTo(placePosition);
                     showInfoWindow(marker, places[i]);
@@ -323,8 +347,9 @@
                 listEl.appendChild(itemEl);
             }
 
-            // 검색된 장소들이 모두 보이도록 지도 시점 조절
-            map.setBounds(bounds);
+            if (shouldMoveBounds) {
+                map.setBounds(bounds);
+            }
         }
 
         // 상세 팝업(인포윈도우) 표시 함수

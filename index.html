@@ -39,7 +39,7 @@
         .search-box {
             display: flex;
             gap: 5px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .search-box input {
@@ -63,6 +63,37 @@
             background-color: #fada0a;
         }
 
+        /* 카테고리 탭 스타일 */
+        .tab-container {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 10px;
+            background-color: #e0e0e0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        .tab-button.active {
+            background-color: #fee500;
+            color: #333;
+        }
+
+        .tab-button:hover {
+            background-color: #d5d5d5;
+        }
+        .tab-button.active:hover {
+            background-color: #fada0a;
+        }
+
         /* 검색 결과 리스트 영역 (스크롤 가능) */
         .result-list {
             flex: 1;
@@ -76,6 +107,11 @@
             border-radius: 4px;
             margin-bottom: 10px;
             border: 1px solid #eee;
+            cursor: pointer;
+        }
+
+        .result-item:hover {
+            background-color: #f0f0f0;
         }
 
         .result-item h5 {
@@ -94,6 +130,20 @@
             flex: 1; 
             height: 100%;
         }
+
+        /* 인포윈도우 커스텀 스타일 */
+        .info-window-content {
+            padding: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #333;
+        }
+        .info-window-content strong {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 3px;
+            color: #000;
+        }
     </style>
 </head>
 <body>
@@ -101,10 +151,19 @@
     <div class="container">
         <!-- 왼쪽: 검색 및 결과창 -->
         <div class="search-panel">
+            <!-- 키워드 검색창 -->
             <div class="search-box">
                 <input type="text" id="keyword" placeholder="장소를 입력하세요 (예: 홍대맛집)">
                 <button onclick="searchPlaces()">검색</button>
             </div>
+
+            <!-- 추천 카테고리 탭 -->
+            <div class="tab-container">
+                <button class="tab-button" onclick="selectTab('FD6', this)">뭐 먹지?</button>
+                <button class="tab-button" onclick="selectTab('CE7', this)">뭐 마시지?</button>
+                <button class="tab-button" onclick="selectTab('COMPLEX', this)">뭐 하지?</button>
+            </div>
+
             <ul id="placesList" class="result-list"></ul>
         </div>
 
@@ -118,6 +177,7 @@
         let map;
         let ps;
         let markers = []; 
+        let infoWindow; // 상세 팝업을 위한 인포윈도우 객체
 
         // 지도가 안전하게 로드된 후에 실행
         kakao.maps.load(function() {
@@ -130,6 +190,11 @@
             // 지도 및 장소 검색 객체 생성
             map = new kakao.maps.Map(mapContainer, mapOption);
             ps = new kakao.maps.services.Places();
+            infoWindow = new kakao.maps.InfoWindow({ zIndex: 1 });
+
+            // 지도 확대/축소 컨트롤 추가
+            const zoomControl = new kakao.maps.ZoomControl();
+            map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHTTOP);
 
             // 위치 권한을 요청하여 현재 위치를 중심으로 지도 설정
             if (navigator.geolocation) {
@@ -152,7 +217,64 @@
             }
         });
 
-        // 장소 검색 함수
+        // 탭 선택 및 카테고리 검색 기능
+        function selectTab(categoryCode, element) {
+            // 모든 탭의 active 클래스 제거 후 클릭된 탭에 추가
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(btn => btn.classList.remove('active'));
+            element.classList.add('active');
+
+            // 검색창 비우기 (카테고리 검색 집중을 위함)
+            document.getElementById('keyword').value = '';
+
+            // 기존 마커, 리스트, 팝업 지우기
+            removeMarker();
+            infoWindow.close();
+            document.getElementById('placesList').innerHTML = '';
+
+            const currentCenter = map.getCenter(); // 현재 지도 중심 기준으로 검색
+
+            if (categoryCode === 'COMPLEX') {
+                // '뭐 하지?' 탭은 문화시설(CT1)과 관광명소(AT4)를 동시에 가져와야 하므로 병렬 호출 처리
+                let combinedData = [];
+                let completedRequests = 0;
+
+                const handleComplexResult = (data, status) => {
+                    completedRequests++;
+                    if (status === kakao.maps.services.Status.OK) {
+                        combinedData = combinedData.concat(data);
+                    }
+                    
+                    // 두 가지 카테고리 조회가 모두 끝났을 때 화면에 표시
+                    if (completedRequests === 2) {
+                        if (combinedData.length > 0) {
+                            displayPlaces(combinedData);
+                        } else {
+                            alert('주변에 문화시설이나 관광명소가 없습니다.');
+                        }
+                    }
+                };
+
+                // CT1 검색
+                ps.categorySearch('CT1', function(data, status) {
+                    handleComplexResult(data, status);
+                }, { location: currentCenter, radius: 2000 });
+
+                // AT4 검색
+                ps.categorySearch('AT4', function(data, status) {
+                    handleComplexResult(data, status);
+                }, { location: currentCenter, radius: 2000 });
+
+            } else {
+                // 일반 카테고리(음식점, 카페) 검색 (반경 2km 이내)
+                ps.categorySearch(categoryCode, placesSearchCB, {
+                    location: currentCenter,
+                    radius: 2000
+                });
+            }
+        }
+
+        // 키워드 장소 검색 함수
         function searchPlaces() {
             const keyword = document.getElementById('keyword').value;
 
@@ -161,6 +283,11 @@
                 return;
             }
 
+            // 키워드 검색 시에는 탭 활성화 상태 해제
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(btn => btn.classList.remove('active'));
+
+            infoWindow.close();
             ps.keywordSearch(keyword, placesSearchCB); 
         }
 
@@ -191,6 +318,7 @@
                 });
                 markers.push(marker); 
 
+                // 리스트 아이템 생성
                 const itemEl = document.createElement('li');
                 itemEl.className = 'result-item';
                 itemEl.innerHTML = `
@@ -198,12 +326,36 @@
                     <p>${places[i].road_address_name ? places[i].road_address_name : places[i].address_name}</p>
                 `;
                 
+                // 마커 클릭 시 상세 팝업 표시 이벤트 등록
+                kakao.maps.event.addListener(marker, 'click', function() {
+                    showInfoWindow(marker, places[i]);
+                });
+
+                // 리스트 아이템 클릭 시에도 지도 중심 이동 및 팝업 열기
+                itemEl.onclick = function() {
+                    map.panTo(placePosition);
+                    showInfoWindow(marker, places[i]);
+                };
+                
                 bounds.extend(placePosition);
                 listEl.appendChild(itemEl);
             }
 
             // 검색된 장소들이 모두 보이도록 지도 시점 조절
             map.setBounds(bounds);
+        }
+
+        // 상세 팝업(인포윈도우) 표시 함수
+        function showInfoWindow(marker, place) {
+            const content = `
+                <div class="info-window-content">
+                    <strong>${place.place_name}</strong>
+                    <span>${place.road_address_name ? place.road_address_name : place.address_name}</span><br>
+                    ${place.phone ? `<small style="color:#888;">${place.phone}</small>` : ''}
+                </div>
+            `;
+            infoWindow.setContent(content);
+            infoWindow.open(map, marker);
         }
 
         // 마커 제거 함수
